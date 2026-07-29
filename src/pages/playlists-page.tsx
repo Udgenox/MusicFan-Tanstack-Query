@@ -1,14 +1,13 @@
-import './App.css'
 import {useQuery} from "@tanstack/react-query";
 import {useEffect, useState} from "react";
-import {client} from "./shared/api/client";
+import {client} from "../shared/api/client";
 
-function App() {
+function PlaylistsPage() {
     const [isVisible, setIsVisible] = useState(true)
     useEffect(() => {
         setInterval(() => {
             setIsVisible((prev) => !prev)
-        }, 300000)
+        }, 30000000)
     }, [])
 
 
@@ -22,18 +21,16 @@ function App() {
 
 const Playlists = () => {
     const query = useQuery({
-        staleTime: 2000,
+        staleTime: Infinity,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
-        gcTime: 5 * 1000,
+        // gcTime: 5 * 1000,
         queryKey: ["playlists"],
         queryFn: () =>
             client.GET("/playlists")
         ,
     })
-
-
     return (
         <div>
             <ul>
@@ -45,4 +42,4 @@ const Playlists = () => {
     )
 }
 
-export default App
+export default PlaylistsPage
