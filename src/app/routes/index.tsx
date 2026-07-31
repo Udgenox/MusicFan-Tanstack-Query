@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router"
-import PlaylistsPage from "../../pages/playlists-page";
+import {PlaylistsPage} from "../../pages/playlists-page";
 
 
 
