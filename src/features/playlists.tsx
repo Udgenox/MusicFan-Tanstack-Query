@@ -1,18 +1,20 @@
 import {keepPreviousData, useQuery} from "@tanstack/react-query";
-import {useState} from "react";
+import {type ChangeEvent, useState} from "react";
 import {client} from "../shared/api/client";
 import {Pagination} from "../shared/ui/pagination/pagination";
 
 export const Playlists = () => {
     const [page, setPage] = useState(1)
+    const [search, setSearch] = useState("")
 
     const query = useQuery({
-        queryKey: ["playlists", page],
+        queryKey: ["playlists", {page, search}],
         queryFn: async ({signal}) => {
             const response = await client.GET("/playlists", {
                 params: {
                     query: {
                         pageNumber: page,
+                        search,
                     },
                 },
                 signal,
@@ -33,6 +35,13 @@ export const Playlists = () => {
 
     return (
         <div>
+            <div>
+                <input
+                    value={search}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setSearch(e.currentTarget.value)}
+                    placeholder={"search..."}
+                />
+            </div>
             <hr />
             <Pagination
                 pagesCount={query.data.meta.pagesCount}
