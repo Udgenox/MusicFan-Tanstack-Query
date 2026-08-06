@@ -3,7 +3,11 @@ import {type ChangeEvent, useState} from "react";
 import {client} from "../shared/api/client";
 import {Pagination} from "../shared/ui/pagination/pagination";
 
-export const Playlists = () => {
+type Props = {
+    userId?: string
+}
+
+export const Playlists = ({userId} : Props) => {
     const [page, setPage] = useState(1)
     const [search, setSearch] = useState("")
 
@@ -15,6 +19,7 @@ export const Playlists = () => {
                     query: {
                         pageNumber: page,
                         search,
+                        userId,
                     },
                 },
                 signal,
@@ -25,6 +30,10 @@ export const Playlists = () => {
             return response.data
         },
         placeholderData: keepPreviousData,
+        // ✅ Добавляем настройки для обновления
+        staleTime: 0, // Данные сразу устаревают
+        refetchOnMount: 'always', // Всегда перезапрашивать при монтировании
+        refetchOnWindowFocus: true, // Обновлять при возврате на вкладку
     })
 
     console.log("status:" + query.status)
