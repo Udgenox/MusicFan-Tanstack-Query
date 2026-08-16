@@ -10,11 +10,11 @@ import {routeTree} from "../routes/routeTree.gen";
 const queryClient = new QueryClient({
         defaultOptions: {
             queries: {
-                staleTime: 5000,
-                refetchOnWindowFocus: false,
-                refetchOnReconnect: false,
-                refetchOnMount: false,
-                gcTime: 20 * 1000
+                staleTime: Infinity,
+                refetchOnMount: true,
+                refetchOnWindowFocus: true,
+                refetchOnReconnect: true,
+                gcTime: 5 * 60 * 1000,
             }
         }
     }) //создание экземпляра клиента React
