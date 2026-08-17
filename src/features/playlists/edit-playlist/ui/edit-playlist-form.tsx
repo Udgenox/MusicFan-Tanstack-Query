@@ -1,118 +1,70 @@
-import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
-import {useEffect} from "react";
-import {useForm} from "react-hook-form";
-import {client} from "../../../../shared/api/client";
-import type {
-     SchemaGetPlaylistsOutput,
-    SchemaUpdatePlaylistRequestPayload
-} from "../../../../shared/api/schema";
-import {useMeQuery} from "../../../auth/api/use-me-query";
+import { useQuery } from "@tanstack/react-query"
+import { useEffect } from "react"
+import { useForm } from "react-hook-form"
+import { client } from "../../../../shared/api/client"
+import { playlistsKeys } from "../../../../shared/api/keys-factories/playlists-keys-factories"
+import type { SchemaUpdatePlaylistRequestPayload } from "../../../../shared/api/schema"
+import { useUpdatePlaylistMutation } from "../api/use-update-playlist-mutation"
 
 type Props = {
     playlistId: string | null;
 }
 
-export const EditPlaylistForm = ({playlistId}: Props) => {
-    const {
-        register,
-        handleSubmit,
-        reset
-    } = useForm<SchemaUpdatePlaylistRequestPayload>()
+export const EditPlaylistForm = ({ playlistId }: Props) => {
+  const { register, handleSubmit, reset } =
+    useForm<SchemaUpdatePlaylistRequestPayload>()
 
-    const {data: meData} = useMeQuery ()
+  const playlistQuery = useQuery({
+    queryKey: playlistsKeys.detail(playlistId),
+    queryFn: async () => {
+      const response = await client.GET("/playlists/{playlistId}", {
+        params: { path: { playlistId: playlistId! } },
+      })
+      return response.data!
+    },
+    enabled: Boolean(playlistId),
+  })
 
-    useEffect(() => {
-        reset()
-    }, [playlistId])
+  const updatePlaylist = useUpdatePlaylistMutation()
 
-    const {data, isError, isFetching} = useQuery({
-        queryKey: ["playlistId", 'details', playlistId],
-        queryFn: async () => {
-            const response = await client.GET('/playlists/{playlistId}', {params: {path: {playlistId: playlistId!}}});
-            return response.data!;
+  useEffect(() => {
+    const playlist = playlistQuery.data?.data
+    if (!playlist) return
+
+    reset({
+      data: {
+        type: "playlists",
+        attributes: {
+          title: playlist.attributes.title,
+          description: playlist.attributes.description,
+          tagIds: playlist.attributes.tags.map((tag) => tag.id),
         },
-        enabled: !!playlistId,
+      },
     })
+  }, [playlistQuery.data, reset])
 
-    const queryClient = useQueryClient()
+  const onSubmit = (payload: SchemaUpdatePlaylistRequestPayload) => {
+    if (!playlistId) return
+    updatePlaylist.mutate({ playlistId, payload })
+  }
 
-    const key = ["playlists", "my", meData?.userId] as const
+  if (!playlistId) return null
+  if (playlistQuery.isPending) return <p>Loading...</p>
+  if (playlistQuery.isError || !playlistQuery.data) return <p>Error...</p>
 
-    const {mutate} = useMutation({
-        mutationFn: async (data:SchemaUpdatePlaylistRequestPayload) => {
-            const response = await  client.PUT('/playlists/{playlistId}', {
-                params: {path: {playlistId: playlistId!}},
-                body: {
-                    data: {
-                        type: "playlists",
-                        attributes: {
-                            ...data.data.attributes,
-                            tagIds: [],
-                        },
-                    },
-                }
-            })
-            return response.data
-        },
-        onMutate: async (formData) => {
-            await queryClient.cancelQueries({ queryKey: ["playlists"] })
-
-            const previousMyPlaylists =
-                queryClient.getQueryData<SchemaGetPlaylistsOutput>(key)
-
-            queryClient.setQueryData<SchemaGetPlaylistsOutput>(
-                key,
-                (oldData) => {
-                    if (!oldData) return oldData
-
-                    return {
-                        ...oldData,
-                        data: oldData.data.map((playlist) =>
-                            playlist.id === playlistId
-                                ? {
-                                    ...playlist,
-                                    attributes: {
-                                        ...playlist.attributes,
-                                        title: formData.data.attributes.title,
-                                        description: formData.data.attributes.description,
-                                    },
-                                }
-                                : playlist,
-                        ),
-                    }
-                },
-            )
-
-            return { previousMyPlaylists }
-        },
-        onError: (_error, _variables, context) => {
-            if (context?.previousMyPlaylists) {
-                queryClient.setQueryData(key, context.previousMyPlaylists)
-            }
-        },
-        onSettled: () =>
-            queryClient.invalidateQueries({
-                queryKey: ["playlists"],
-                refetchType: 'all',
-            })
-    })
-
-    const onSubmit = (data: SchemaUpdatePlaylistRequestPayload) => {
-        mutate(data)
-    }
-
-    if (!playlistId) return <></>
-    if (isFetching) return <p>Loading...</p>
-    if (isError || !data) return <p>Error...</p>
-
-    return <form onSubmit={handleSubmit(onSubmit)}>
-        <h2>Edit Playlist</h2>
-        <p>
-            <input  {...register("data.attributes.title")} defaultValue={data.data.attributes.title} />
-        </p>
-        <p>
-            <textarea {...register('data.attributes.description')} defaultValue={data.data.attributes.description ?? ""}></textarea>
-        </p>
-        <button type='submit'>Save</button>
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <h2>Edit Playlist</h2>
+      <p>
+        <input {...register("data.attributes.title", { required: true })} />
+      </p>
+      <p>
+        <textarea {...register("data.attributes.description")} />
+      </p>
+      {updatePlaylist.isError && <p>Could not save the playlist.</p>}
+      <button type="submit" disabled={updatePlaylist.isPending}>
+        {updatePlaylist.isPending ? "Saving..." : "Save"}
+      </button>
     </form>
+  )
 }

@@ -1,8 +1,7 @@
-import {keepPreviousData, useQuery} from "@tanstack/react-query";
 import {type ChangeEvent, useState} from "react";
 import {DeletePlaylist} from "../../../features/playlists/delete-playlist/ui/delete-playlist";
-import {client} from "../../../shared/api/client";
 import {Pagination} from "../../../shared/ui/pagination/pagination";
+import {usePlaylistsQuery} from "../api/use-playlists-query";
 
 type Props = {
     userId?: string
@@ -10,38 +9,14 @@ type Props = {
     isSearchActive?: boolean
 }
 
-export const Playlists = ({userId, onPlaylistSelected, isSearchActive} : Props) => {
-    const [page, setPage] = useState(1)
+export const Playlists = ({userId, onPlaylistSelected, isSearchActive}: Props) => {
+    const [pageNumber, setPageNumber] = useState(1)
     const [search, setSearch] = useState("")
 
-    const key = userId ? ["playlists", 'my', userId] : ["playlists", {page, search}]
-    const queryParams = userId ? {
-        userId
-    } : {
-        pageNumber: page,
-        search
-    }
 
-    // eslint-disable-next-line @tanstack/query/exhaustive-deps
-    const query = useQuery({
-        queryKey: key,
-        queryFn: async ({signal}) => {
-            const response = await client.GET("/playlists", {
-                params: {
-                    query: queryParams,
-                },
-                signal,
-            })
-            if (response.error) {
-                throw (response as unknown as { error: Error }).error
-            }
-            return response.data
-        },
-        placeholderData: keepPreviousData,
-        // ✅ Добавляем настройки для обновления
-        staleTime: 30_000, // Данные сразу устаревают
-        refetchOnMount: false, // Всегда перезапрашивать при монтировании
-        refetchOnWindowFocus: false, // Обновлять при возврате на вкладку
+    const query = usePlaylistsQuery(userId, {
+        pageNumber,
+        search: isSearchActive ? search : "",
     })
 
     console.log("status:" + query.status)
@@ -52,7 +27,9 @@ export const Playlists = ({userId, onPlaylistSelected, isSearchActive} : Props) 
     }
 
     if (query.isPending) return <span>Loading...</span>
-    if (query.isError) return <span>{JSON.stringify(query.error.message)}</span>
+    if (query.isError || !query.data) {
+        return <span>Error loading playlists</span>
+    }
 
     return (
         <div>
@@ -64,17 +41,22 @@ export const Playlists = ({userId, onPlaylistSelected, isSearchActive} : Props) 
                 />
             </div>
             }
-            <hr />
+            <hr/>
             <Pagination
                 pagesCount={query.data.meta.pagesCount}
                 current={query.data.meta.page}
-                changePageNumber={setPage}
+                changePageNumber={setPageNumber}
                 isFetching={query.isFetching}
             />
+
             <ul>
                 {query.data.data.map((playlist) => (
-                    <li key={playlist.id} onClick={() => handleSelectPlaylistClick(playlist.id)}>
-                        {playlist.attributes.title} <DeletePlaylist playlistId={playlist.id} />
+                    <li
+                        key={playlist.id}
+                        onClick={() => handleSelectPlaylistClick(playlist.id)}
+                    >
+                        {playlist.attributes.title}
+                        <DeletePlaylist playlistId={playlist.id} />
                     </li>
                 ))}
             </ul>
