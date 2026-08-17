@@ -3,8 +3,10 @@ import {useEffect} from "react";
 import {useForm} from "react-hook-form";
 import {client} from "../../../../shared/api/client";
 import type {
+     SchemaGetPlaylistsOutput,
     SchemaUpdatePlaylistRequestPayload
 } from "../../../../shared/api/schema";
+import {useMeQuery} from "../../../auth/api/use-me-query";
 
 type Props = {
     playlistId: string | null;
@@ -17,12 +19,14 @@ export const EditPlaylistForm = ({playlistId}: Props) => {
         reset
     } = useForm<SchemaUpdatePlaylistRequestPayload>()
 
+    const {data: meData} = useMeQuery ()
+
     useEffect(() => {
         reset()
     }, [playlistId])
 
     const {data, isError, isFetching} = useQuery({
-        queryKey: ["playlistId", playlistId],
+        queryKey: ["playlistId", 'details', playlistId],
         queryFn: async () => {
             const response = await client.GET('/playlists/{playlistId}', {params: {path: {playlistId: playlistId!}}});
             return response.data!;
@@ -31,6 +35,8 @@ export const EditPlaylistForm = ({playlistId}: Props) => {
     })
 
     const queryClient = useQueryClient()
+
+    const key = ["playlists", "my", meData?.userId] as const
 
     const {mutate} = useMutation({
         mutationFn: async (data:SchemaUpdatePlaylistRequestPayload) => {
@@ -48,12 +54,47 @@ export const EditPlaylistForm = ({playlistId}: Props) => {
             })
             return response.data
         },
-        onSuccess: () => {
+        onMutate: async (formData) => {
+            await queryClient.cancelQueries({ queryKey: ["playlists"] })
+
+            const previousMyPlaylists =
+                queryClient.getQueryData<SchemaGetPlaylistsOutput>(key)
+
+            queryClient.setQueryData<SchemaGetPlaylistsOutput>(
+                key,
+                (oldData) => {
+                    if (!oldData) return oldData
+
+                    return {
+                        ...oldData,
+                        data: oldData.data.map((playlist) =>
+                            playlist.id === playlistId
+                                ? {
+                                    ...playlist,
+                                    attributes: {
+                                        ...playlist.attributes,
+                                        title: formData.data.attributes.title,
+                                        description: formData.data.attributes.description,
+                                    },
+                                }
+                                : playlist,
+                        ),
+                    }
+                },
+            )
+
+            return { previousMyPlaylists }
+        },
+        onError: (_error, _variables, context) => {
+            if (context?.previousMyPlaylists) {
+                queryClient.setQueryData(key, context.previousMyPlaylists)
+            }
+        },
+        onSettled: () =>
             queryClient.invalidateQueries({
                 queryKey: ["playlists"],
-                refetchType: 'active',
+                refetchType: 'all',
             })
-        }
     })
 
     const onSubmit = (data: SchemaUpdatePlaylistRequestPayload) => {

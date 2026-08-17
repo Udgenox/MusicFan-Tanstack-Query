@@ -7,22 +7,28 @@ import {Pagination} from "../../../shared/ui/pagination/pagination";
 type Props = {
     userId?: string
     onPlaylistSelected?: (playlistId: string) => void
+    isSearchActive?: boolean
 }
 
-export const Playlists = ({userId, onPlaylistSelected} : Props) => {
+export const Playlists = ({userId, onPlaylistSelected, isSearchActive} : Props) => {
     const [page, setPage] = useState(1)
     const [search, setSearch] = useState("")
 
+    const key = userId ? ["playlists", 'my', userId] : ["playlists", {page, search}]
+    const queryParams = userId ? {
+        userId
+    } : {
+        pageNumber: page,
+        search
+    }
+
+    // eslint-disable-next-line @tanstack/query/exhaustive-deps
     const query = useQuery({
-        queryKey: ["playlists", {page, search}],
+        queryKey: key,
         queryFn: async ({signal}) => {
             const response = await client.GET("/playlists", {
                 params: {
-                    query: {
-                        pageNumber: page,
-                        search,
-                        userId,
-                    },
+                    query: queryParams,
                 },
                 signal,
             })
@@ -50,13 +56,14 @@ export const Playlists = ({userId, onPlaylistSelected} : Props) => {
 
     return (
         <div>
-            <div>
+            {isSearchActive && <div>
                 <input
                     value={search}
                     onChange={(e: ChangeEvent<HTMLInputElement>) => setSearch(e.currentTarget.value)}
                     placeholder={"search..."}
                 />
             </div>
+            }
             <hr />
             <Pagination
                 pagesCount={query.data.meta.pagesCount}
